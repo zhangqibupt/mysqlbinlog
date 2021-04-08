@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/dropbox/godropbox/database/sqlbuilder"
-	SQL "github.com/dropbox/godropbox/database/sqlbuilder"
+	"github.com/manilion/godropbox/database/sqlbuilder"
+	SQL "github.com/manilion/godropbox/database/sqlbuilder"
 	"github.com/siddontang/go-mysql/mysql"
 	"github.com/siddontang/go-mysql/replication"
 )
