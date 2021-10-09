@@ -1,4 +1,4 @@
-module github.com/zhangqibupt/mysqlbinlog
+module github.freewheel.tv/bricks/mysqlbinlog
 
 go 1.12
 
@@ -6,6 +6,7 @@ require (
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd v0.0.0-20190719114852-fd7a80b32e1f // indirect
 	github.com/davecgh/go-spew v1.1.1
+	github.com/go-sql-driver/mysql v1.4.1
 	github.com/kr/pty v1.1.5 // indirect
 	github.com/manilion/godropbox v1.0.1
 	github.com/montanaflynn/stats v0.5.0 // indirect
