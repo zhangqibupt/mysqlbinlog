@@ -171,7 +171,7 @@ func startGenRollbackSql() {
 						}
 						txtStr, coOk := ev.BinEvent.Rows[ri][ci].([]byte)
 						if !coOk {
-							log.Fatalf("fail to convert %s.%s %v to []byte type %s")
+							log.Fatalf("fail to convert %s to []byte type", ev.BinEvent.Rows[ri][ci])
 						} else {
 							ev.BinEvent.Rows[ri][ci] = string(txtStr)
 						}
@@ -195,7 +195,7 @@ func startGenRollbackSql() {
 		} else if ev.SqlType == SQLTypeUpdate {
 			sqls = genUpdateSqls(posStr, colsTypeNameFromMysql, colsTypeName, ev.BinEvent, colsDef, uniqueKeyIdx, false, true)
 		} else {
-			log.Printf("Error: unsupported query type %s to generate rollback sql, it should one of insert|update|delete. %s", ev.SqlType, ev.MyPos.String())
+			log.Printf("Error: unsupported query type %d to generate rollback sql, it should one of insert|update|delete. %s", ev.SqlType, ev.MyPos.String())
 			continue
 		}
 		rollbackSQL.append(sqls)
@@ -377,7 +377,7 @@ func genInsertSqls(posStr string, rEv *replication.RowsEvent, colDefs []sqlbuild
 		endIndex = minValue(rowCnt, i+rowsPerSql)
 		oneSql, err = genInsertSqlForRows(rEv.Rows[i:endIndex], insertSql, schema, ifprefixDb, false, []int{})
 		if err != nil {
-			log.Printf("Error: Fail to generate %s sql for %s %s \n\terror: %s\n\trows data:%v")
+			log.Printf("Error: Fail to generate for %v due to %s", rEv.Rows[i:endIndex], err.Error())
 		} else {
 			sqlArr = append(sqlArr, oneSql)
 		}

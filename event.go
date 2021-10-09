@@ -117,7 +117,7 @@ func sendBinlogEvent(streamer *replication.BinlogStreamer, eventChan chan myBinE
 			oneMyEvent.SqlType = sqlType
 			eventChan <- *oneMyEvent
 		} else {
-			log.Printf("this should not happen: return value of CheckBinEvent() is %d\n")
+			log.Printf("this should not happen: return value of CheckBinEvent() is %d\n", chkRe)
 		}
 	}
 }
