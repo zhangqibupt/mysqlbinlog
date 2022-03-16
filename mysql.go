@@ -380,15 +380,15 @@ func getTableInfo() error {
 		return fmt.Errorf("failed to get table names, err=%s", err.Error())
 	}
 
-	if err = tableinfo.getTableFields(allTables, 50); err != nil {
+	if err = tableinfo.getTableFields(allTables, 5000); err != nil {
 		return fmt.Errorf("failed to get table fields, err=%s", err.Error())
 	}
 
-	if err = tableinfo.getTableKeys(allTables, 50); err != nil {
+	if err = tableinfo.getTableKeys(allTables, 5000); err != nil {
 		return fmt.Errorf("failed to get table keys, err=%s", err.Error())
 	}
 
-	if err = tableinfo.getTableAutoIncrements(allTables, 50); err != nil {
+	if err = tableinfo.getTableAutoIncrements(allTables, 500); err != nil {
 		return fmt.Errorf("failed to get table auto_increments, err=%s", err.Error())
 	}
 
