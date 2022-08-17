@@ -45,13 +45,13 @@ func (s *myBinEvent) checkBinEvent(cfg *ConfCmd, ev *replication.BinlogEvent, cu
 
 var eventChan = make(chan myBinEvent, 100)
 
-func startListenBinEvents() {
+func startListenBinEvents(pos mysql.Position) {
 	defer close(eventChan)
-	replStreamer := newBinlogStreamer()
+	replStreamer := newBinlogStreamer(pos)
 	sendBinlogEvent(replStreamer, eventChan)
 }
 
-func newBinlogStreamer() *replication.BinlogStreamer {
+func newBinlogStreamer(pos mysql.Position) *replication.BinlogStreamer {
 	replCfg := replication.BinlogSyncerConfig{
 		ServerID:                1113306,
 		Flavor:                  "mysql",
@@ -68,8 +68,7 @@ func newBinlogStreamer() *replication.BinlogStreamer {
 
 	replSyncer := replication.NewBinlogSyncer(replCfg)
 
-	syncPosition := mysql.Position{Name: confCmd.StartFile, Pos: 0}
-	replStreamer, err := replSyncer.StartSync(syncPosition)
+	replStreamer, err := replSyncer.StartSync(pos)
 	if err != nil {
 		log.Fatalf("error replication from master %s:%d ", confCmd.Host, confCmd.Port)
 	}

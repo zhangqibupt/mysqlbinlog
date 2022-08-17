@@ -17,7 +17,7 @@ const (
 const (
 	disableBinlogSQL   = "SET sql_log_bin = OFF;"
 	disableKeyCheckSQL = "SET FOREIGN_KEY_CHECKS=0;"
-	resetMasterSQL     = "RESET MASTER;"
+	showMasterStatusSQL = "SHOW MASTER STATUS;"
 )
 
 const (

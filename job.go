@@ -23,9 +23,6 @@ func Start(host string, port uint, user string, password string, duration time.D
 		RollbackDelay:      duration,
 	}
 
-	if err := resetMaster(); err != nil {
-		return fmt.Errorf("failed to reset master binlog, err=%s", err.Error())
-	}
 
 	if err := disableBinlog(); err != nil {
 		return fmt.Errorf("failed to disable binlog for current connection, err=%s", err.Error())
@@ -39,7 +36,12 @@ func Start(host string, port uint, user string, password string, duration time.D
 		return fmt.Errorf("failed to get table info, err=%s", err.Error())
 	}
 
-	go startListenBinEvents()
+	pos, err := getCurrentPosition()
+	if err != nil {
+		return fmt.Errorf("failed to get binlog current position, err=%s", err.Error())
+	}
+
+	go startListenBinEvents(pos)
 	go startGenRollbackSql()
 	return nil
 }
