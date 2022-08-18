@@ -4,17 +4,12 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strconv"
 	"strings"
 
 	"github.com/siddontang/go-mysql/mysql"
 	"gopkg.in/volatiletech/null.v6"
 )
-
-func resetMaster() error {
-	con := getDBCon()
-	_, err := con.Exec(resetMasterSQL)
-	return err
-}
 
 func disableBinlog() error {
 	con := getDBCon()
@@ -26,6 +21,20 @@ func disableKeyCheck() error {
 	con := getDBCon()
 	_, err := con.Exec(disableKeyCheckSQL)
 	return err
+}
+
+func getCurrentPosition() (pos mysql.Position, err error) {
+	con := getDBCon()
+	var res [5]string
+	if err := con.QueryRow(showMasterStatusSQL).Scan(&res[0], &res[1], &res[2], &res[3], &res[4]); err != nil {
+		return pos, err
+	}
+	p, err := strconv.Atoi(res[1])
+	if err != nil {
+		return pos, err
+	}
+
+	return mysql.Position{Name: res[0], Pos: uint32(p)}, nil
 }
 
 type fieldInfo struct {
@@ -287,7 +296,7 @@ func (s *tablesColumnsInfo) getTableAutoIncrements(dbTbs map[string][]string, ba
 		}
 		for rows.Next() {
 			var dbName, tbName string
-			var autoIncr       null.Uint64
+			var autoIncr null.Uint64
 			if err := rows.Scan(&dbName, &tbName, &autoIncr); err != nil {
 				log.Println("fail to get query result: " + oneQuery)
 				rows.Close()
