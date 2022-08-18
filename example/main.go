@@ -25,6 +25,7 @@ func main() {
 
 	// run case 0 - 9
 	for i := 0; i < 10; i++ {
+		mysqlbinlog.Begin()
 		// run case, execute INSERT, DELETE, UPDATE
 		time.Sleep(time.Second * 2)
 

@@ -14,6 +14,8 @@ import (
 	"github.com/siddontang/go-mysql/replication"
 )
 
+const BLOB = "blob"
+
 type RollbackSQL struct {
 	sqls       []string
 	autoTables map[string]map[string]bool // db, table => true
@@ -39,24 +41,27 @@ func (sql *RollbackSQL) recordInsertDeleteTable(db string, tb string) {
 	tbls[tb] = true
 }
 
-func (sql *RollbackSQL) concatRollbackSql() string {
+func (sql *RollbackSQL) concatRollbackSQL() string {
+	sql.Lock()
 	if len(sql.sqls) == 0 {
+		sql.Unlock()
 		return ""
 	}
+	sql.Unlock()
+
 	// wait until there is no new sqls added in confCmd.RollbackDelay ms
 	for {
-		gap := time.Now().Sub(sql.lastUpdate)
-		//log.Infof("gap=%v, last update is %v", gap, sql.lastUpdate)
+		sql.Lock()
+		gap := time.Since(sql.lastUpdate)
 		if gap > confCmd.RollbackDelay {
+			defer sql.Unlock()
 			break
 		}
+		sql.Unlock()
 		time.Sleep(time.Millisecond * 10)
 	}
 
 	var sb strings.Builder
-
-	sql.Lock()
-	defer sql.Unlock()
 
 	for i := len(sql.sqls) - 1; i >= 0; i-- {
 		sb.WriteString(sql.sqls[i])
@@ -77,6 +82,31 @@ func (sql *RollbackSQL) concatRollbackSql() string {
 	sql.autoTables = map[string]map[string]bool{}
 
 	return sb.String()
+}
+
+func (sql *RollbackSQL) reset() {
+	sql.Lock()
+	if len(sql.sqls) == 0 {
+		sql.Unlock()
+		return
+	}
+	sql.Unlock()
+
+	// wait until there is no new sqls added in confCmd.RollbackDelay ms
+	for {
+		sql.Lock()
+		gap := time.Since(sql.lastUpdate)
+		if gap > confCmd.RollbackDelay {
+			defer sql.Unlock()
+			break
+		}
+		sql.Unlock()
+		time.Sleep(time.Millisecond * 10)
+	}
+
+	sql.sqls = []string{}
+	sql.autoTables = map[string]map[string]bool{}
+	sql.lastUpdate = time.Now()
 }
 
 var rollbackSQL = &RollbackSQL{
@@ -162,7 +192,7 @@ func startGenRollbackSql() {
 		// convert blob type to string
 		for ci, colType := range colsTypeName {
 			colsTypeNameFromMysql[ci] = tbInfo.Columns[ci].FieldType
-			if colType == "blob" {
+			if colType == BLOB {
 				// text is stored as blob
 				if strings.Contains(strings.ToLower(tbInfo.Columns[ci].FieldType), "text") {
 					for ri := range ev.BinEvent.Rows {
@@ -203,9 +233,7 @@ func startGenRollbackSql() {
 }
 
 func getMysqlDataTypeNameAndSqlColumn(tpDef string, colName string, tp byte, meta uint16) (string, sqlbuilder.NonAliasColumn) {
-	// for unkown type, defaults to BytesColumn
-
-	//get real string type
+	// get real string type
 	if tp == mysql.MYSQL_TYPE_STRING {
 		if meta >= 256 {
 			b0 := uint8(meta >> 8)
@@ -244,16 +272,12 @@ func getMysqlDataTypeNameAndSqlColumn(tpDef string, colName string, tp byte, met
 	case mysql.MYSQL_TYPE_BIT:
 		return "bit", sqlbuilder.IntColumn(colName, sqlbuilder.NotNullable)
 	case mysql.MYSQL_TYPE_TIMESTAMP:
-		//return "timestamp", SQL.DateTimeColumn(colName, SQL.NotNullable)
 		return "timestamp", sqlbuilder.StrColumn(colName, sqlbuilder.UTF8, sqlbuilder.UTF8CaseInsensitive, sqlbuilder.NotNullable)
 	case mysql.MYSQL_TYPE_TIMESTAMP2:
-		//return "timestamp", SQL.DateTimeColumn(colName, SQL.NotNullable)
 		return "timestamp", sqlbuilder.StrColumn(colName, sqlbuilder.UTF8, sqlbuilder.UTF8CaseInsensitive, sqlbuilder.NotNullable)
 	case mysql.MYSQL_TYPE_DATETIME:
-		//return "datetime", SQL.DateTimeColumn(colName, SQL.NotNullable)
 		return "timestamp", sqlbuilder.StrColumn(colName, sqlbuilder.UTF8, sqlbuilder.UTF8CaseInsensitive, sqlbuilder.NotNullable)
 	case mysql.MYSQL_TYPE_DATETIME2:
-		//return "datetime", SQL.DateTimeColumn(colName, SQL.NotNullable)
 		return "timestamp", sqlbuilder.StrColumn(colName, sqlbuilder.UTF8, sqlbuilder.UTF8CaseInsensitive, sqlbuilder.NotNullable)
 	case mysql.MYSQL_TYPE_TIME:
 		return "time", sqlbuilder.StrColumn(colName, sqlbuilder.UTF8, sqlbuilder.UTF8CaseInsensitive, sqlbuilder.NotNullable)
@@ -269,11 +293,10 @@ func getMysqlDataTypeNameAndSqlColumn(tpDef string, colName string, tp byte, met
 	case mysql.MYSQL_TYPE_SET:
 		return "set", sqlbuilder.IntColumn(colName, sqlbuilder.NotNullable)
 	case mysql.MYSQL_TYPE_BLOB:
-		//text is stored as blob
 		if strings.Contains(strings.ToLower(tpDef), "text") {
-			return "blob", sqlbuilder.StrColumn(colName, sqlbuilder.UTF8, sqlbuilder.UTF8CaseInsensitive, sqlbuilder.NotNullable)
+			return BLOB, sqlbuilder.StrColumn(colName, sqlbuilder.UTF8, sqlbuilder.UTF8CaseInsensitive, sqlbuilder.NotNullable)
 		}
-		return "blob", sqlbuilder.BytesColumn(colName, sqlbuilder.NotNullable)
+		return BLOB, sqlbuilder.BytesColumn(colName, sqlbuilder.NotNullable)
 	case mysql.MYSQL_TYPE_VARCHAR,
 		mysql.MYSQL_TYPE_VAR_STRING:
 
