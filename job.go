@@ -23,11 +23,6 @@ func Start(host string, port uint, user string, password string, duration time.D
 		RollbackDelay:      duration,
 	}
 
-
-	if err := disableBinlog(); err != nil {
-		return fmt.Errorf("failed to disable binlog for current connection, err=%s", err.Error())
-	}
-
 	if err := disableKeyCheck(); err != nil {
 		return fmt.Errorf("failed to disable key check, err=%s", err.Error())
 	}
@@ -54,10 +49,14 @@ func Stop() {
 
 func Rollback() {
 	con := getDBCon()
-	sql := rollbackSQL.concatRollbackSql()
+	sql := rollbackSQL.concatRollbackSQL()
 	if len(strings.Trim(sql, " \r\n")) != 0 {
 		if _, err := con.Exec(sql); err != nil {
 			log.Fatalf("failed to rollback sql, sql= %s err=%s", sql, err.Error())
 		}
 	}
+}
+
+func Begin() {
+	rollbackSQL.reset()
 }
