@@ -48,3 +48,4 @@ Full code example, please refer to [Example](./example/main.go)
 - This library depends on the mysql binlog functionality, to use this library, please make sure the binlog has been enabled.
 - The binlog events may delay depends on the actual environment, so we added `delay` parameter in `mysqlbinlog.Start()` method. If we set `delay` to 3 seconds, then we will do rollback when it passed 3 seconds since the last event.
 - DDL change is not supported for now.  
+- Loading table schemas from DB could take longer than a few seconds. For local testing you can add env `MYSQL_BINLOG_CACHE` with any value to cache the result, and several cache files will be saved to the current working directory. The cache will not expire and you can delete the cache files to fetch table schemas from DB again.
