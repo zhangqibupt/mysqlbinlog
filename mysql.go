@@ -2,8 +2,11 @@ package mysqlbinlog
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"os"
 	"strconv"
 	"strings"
 
@@ -193,7 +196,7 @@ func (s *tablesColumnsInfo) getTableFields(dbTbs map[string][]string, batchCnt i
 	return nil
 }
 
-func (s *tablesColumnsInfo) getTableKeys(dbTbs map[string][]string, batchCnt int) error {
+func (s *tablesColumnsInfo) getTableKeys(dbTbs map[string][]string, batchCnt int) (err error) {
 	con := getDBCon()
 	var (
 		dbName, tbName, kName, colName, ktype string
@@ -201,51 +204,75 @@ func (s *tablesColumnsInfo) getTableKeys(dbTbs map[string][]string, batchCnt int
 		ok                                    bool
 		dbTbKeysInfo                          = map[string]map[string]map[string]keyInfo{}
 		primaryKeys                           = map[string]map[string]map[string]bool{}
+		f1, f2                                = "./mysql.binlog.cache.1", "./mysql.binlog.cache.2"
+		b1, _                                 = ioutil.ReadFile(f1)
+		b2, _                                 = ioutil.ReadFile(f2)
+		useCache                              = os.Getenv("MYSQL_BINLOG_CACHE") != ""
 	)
 	log.Println("geting primary/unique keys from mysql")
 	//querySqls := GetFieldOrKeyQuerySqls(primaryUniqueKeysSqlBatch, dbTbs, batchCnt)
 	querySqls := getFieldOrKeyQuerySqls(primaryUniqueKeysSQL, dbTbs, batchCnt)
-	for _, oneQuery := range querySqls {
-		rows, err := con.Query(oneQuery)
-		if err != nil {
-			rows.Close()
-			log.Println("fail to query mysql: " + oneQuery)
-			return err
+	if useCache && len(b1) > 0 && len(b2) > 0 {
+		if err = json.Unmarshal(b1, &dbTbKeysInfo); err != nil {
+			return
 		}
-
-		for rows.Next() {
-			//select k.table_schema, k.table_name, k.CONSTRAINT_NAME, k.COLUMN_NAME, c.CONSTRAINT_TYPE, k.ORDINAL_POSITION
-			if err := rows.Scan(&dbName, &tbName, &kName, &colName, &ktype, &colPos); err != nil {
-				log.Println("fail to get query result: " + oneQuery)
+		if err = json.Unmarshal(b2, &primaryKeys); err != nil {
+			return
+		}
+		log.Println("got cache")
+	} else {
+		for _, oneQuery := range querySqls {
+			rows, err := con.Query(oneQuery)
+			if err != nil {
 				rows.Close()
+				log.Println("fail to query mysql: " + oneQuery)
 				return err
 			}
-			if _, ok = dbTbKeysInfo[dbName]; !ok {
-				dbTbKeysInfo[dbName] = map[string]map[string]keyInfo{}
-			}
-			if _, ok = dbTbKeysInfo[dbName][tbName]; !ok {
-				dbTbKeysInfo[dbName][tbName] = map[string]keyInfo{}
-			}
-			if _, ok = dbTbKeysInfo[dbName][tbName][kName]; !ok {
-				dbTbKeysInfo[dbName][tbName][kName] = keyInfo{}
-			}
-			if !ContainsString(dbTbKeysInfo[dbName][tbName][kName], colName) {
-				dbTbKeysInfo[dbName][tbName][kName] = append(dbTbKeysInfo[dbName][tbName][kName], colName)
-			}
 
-			if ktype == "PRIMARY KEY" {
-				if _, ok = primaryKeys[dbName]; !ok {
-					primaryKeys[dbName] = map[string]map[string]bool{}
+			for rows.Next() {
+				//select k.table_schema, k.table_name, k.CONSTRAINT_NAME, k.COLUMN_NAME, c.CONSTRAINT_TYPE, k.ORDINAL_POSITION
+				if err := rows.Scan(&dbName, &tbName, &kName, &colName, &ktype, &colPos); err != nil {
+					log.Println("fail to get query result: " + oneQuery)
+					rows.Close()
+					return err
 				}
-				if _, ok = primaryKeys[dbName][tbName]; !ok {
-					primaryKeys[dbName][tbName] = map[string]bool{}
+				if _, ok = dbTbKeysInfo[dbName]; !ok {
+					dbTbKeysInfo[dbName] = map[string]map[string]keyInfo{}
 				}
-				primaryKeys[dbName][tbName][kName] = true
+				if _, ok = dbTbKeysInfo[dbName][tbName]; !ok {
+					dbTbKeysInfo[dbName][tbName] = map[string]keyInfo{}
+				}
+				if _, ok = dbTbKeysInfo[dbName][tbName][kName]; !ok {
+					dbTbKeysInfo[dbName][tbName][kName] = keyInfo{}
+				}
+				if !ContainsString(dbTbKeysInfo[dbName][tbName][kName], colName) {
+					dbTbKeysInfo[dbName][tbName][kName] = append(dbTbKeysInfo[dbName][tbName][kName], colName)
+				}
+
+				if ktype == "PRIMARY KEY" {
+					if _, ok = primaryKeys[dbName]; !ok {
+						primaryKeys[dbName] = map[string]map[string]bool{}
+					}
+					if _, ok = primaryKeys[dbName][tbName]; !ok {
+						primaryKeys[dbName][tbName] = map[string]bool{}
+					}
+					primaryKeys[dbName][tbName][kName] = true
+				}
+
 			}
+			rows.Close()
 
 		}
-		rows.Close()
-
+		if useCache {
+			b1, _ = json.Marshal(dbTbKeysInfo)
+			b2, _ = json.Marshal(primaryKeys)
+			if err = ioutil.WriteFile(f1, b1, 0644); err != nil {
+				return
+			}
+			if err = ioutil.WriteFile(f2, b2, 0644); err != nil {
+				return
+			}
+		}
 	}
 
 	var isPrimay = false
