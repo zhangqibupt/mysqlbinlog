@@ -43,6 +43,7 @@ func getCurrentPosition() (pos mysql.Position, err error) {
 type fieldInfo struct {
 	FieldName string `json:"column_name"`
 	FieldType string `json:"column_type"`
+	Extra     string `json:"extra"`
 }
 
 type keyInfo []string //{colname1, colname2}
@@ -148,6 +149,7 @@ func (s *tablesColumnsInfo) getTableFields(dbTbs map[string][]string, batchCnt i
 		colName        string
 		dataType       string
 		colPos         int
+		extra          string
 		ok             bool
 		querySqls      []string
 		dbTbFieldsInfo = map[string]map[string][]fieldInfo{}
@@ -164,7 +166,7 @@ func (s *tablesColumnsInfo) getTableFields(dbTbs map[string][]string, batchCnt i
 		}
 
 		for rows.Next() {
-			if err := rows.Scan(&dbName, &tbName, &colName, &dataType, &colPos); err != nil {
+			if err := rows.Scan(&dbName, &tbName, &colName, &dataType, &colPos, &extra); err != nil {
 				log.Println("error to get query result: " + oneQuery)
 				rows.Close()
 				return err
@@ -175,7 +177,7 @@ func (s *tablesColumnsInfo) getTableFields(dbTbs map[string][]string, batchCnt i
 			if _, ok = dbTbFieldsInfo[dbName][tbName]; !ok {
 				dbTbFieldsInfo[dbName][tbName] = []fieldInfo{}
 			}
-			dbTbFieldsInfo[dbName][tbName] = append(dbTbFieldsInfo[dbName][tbName], fieldInfo{FieldName: colName, FieldType: dataType})
+			dbTbFieldsInfo[dbName][tbName] = append(dbTbFieldsInfo[dbName][tbName], fieldInfo{FieldName: colName, FieldType: dataType, Extra: extra})
 
 		}
 		rows.Close()

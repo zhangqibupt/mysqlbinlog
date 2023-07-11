@@ -168,6 +168,9 @@ func startGenRollbackSql() {
 
 			colCnt = len(ev.BinEvent.Rows[0])
 			allColNames = getAllFieldNamesWithDroppedFields(colCnt, tbInfo.Columns)
+			allColNames, ev.BinEvent.Rows = filterStoredGeneratedFields(allColNames, ev.BinEvent.Rows)
+
+			colCnt = len(ev.BinEvent.Rows[0])
 			colsDef, colsTypeName = getSqlFieldsExpressions(colCnt, allColNames, ev.BinEvent.Table)
 			colsTypeNameFromMysql = make([]string, len(colsTypeName))
 			if len(colsTypeName) <= len(tbInfo.Columns) {
@@ -230,6 +233,49 @@ func startGenRollbackSql() {
 		}
 		rollbackSQL.append(sqls)
 	}
+}
+
+func filterStoredGeneratedFields(names []fieldInfo, rows [][]interface{}) ([]fieldInfo, [][]interface{}) {
+	var (
+		newNames []fieldInfo
+		newRows  [][]interface{}
+	)
+
+	// find removal index ids
+	removalIds := make([]int, 0, len(names))
+	for i, col := range names {
+		if col.Extra == "STORED GENERATED" {
+			removalIds = append(removalIds, i)
+		}
+	}
+	// remove columns
+	for i, col := range names {
+		if !containsInt(removalIds, i) {
+			newNames = append(newNames, col)
+		}
+	}
+
+	for _, row := range rows {
+		newRow := make([]interface{}, 0, len(row))
+		for i, col := range row {
+			if !containsInt(removalIds, i) {
+				newRow = append(newRow, col)
+			}
+		}
+		newRows = append(newRows, newRow)
+	}
+
+	return newNames, newRows
+}
+
+// method to check if an int is in an int slice
+func containsInt(s []int, e int) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
 }
 
 func getMysqlDataTypeNameAndSqlColumn(tpDef string, colName string, tp byte, meta uint16) (string, sqlbuilder.NonAliasColumn) {
