@@ -249,22 +249,20 @@ func filterStoredGeneratedFields(names []fieldInfo, rows [][]interface{}) ([]fie
 		}
 	}
 	// remove columns
-	if len(removalIds) > 0 {
-		for i, col := range names {
-			if !containsInt(removalIds, i) {
-				newNames = append(newNames, col)
-			}
+	for i, col := range names {
+		if !containsInt(removalIds, i) {
+			newNames = append(newNames, col)
 		}
+	}
 
-		for _, row := range rows {
-			newRow := make([]interface{}, 0, len(row))
-			for i, col := range row {
-				if !containsInt(removalIds, i) {
-					newRow = append(newRow, col)
-				}
+	for _, row := range rows {
+		newRow := make([]interface{}, 0, len(row))
+		for i, col := range row {
+			if !containsInt(removalIds, i) {
+				newRow = append(newRow, col)
 			}
-			newRows = append(newRows, newRow)
 		}
+		newRows = append(newRows, newRow)
 	}
 
 	return newNames, newRows
