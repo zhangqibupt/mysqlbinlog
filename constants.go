@@ -11,12 +11,12 @@ const (
 )
 
 const (
-	KeyDbTableSep   = "."
+	KeyDbTableSep = "."
 )
 
 const (
-	disableBinlogSQL   = "SET sql_log_bin = OFF;"
-	disableKeyCheckSQL = "SET FOREIGN_KEY_CHECKS=0;"
+	disableBinlogSQL    = "SET sql_log_bin = OFF;"
+	disableKeyCheckSQL  = "SET FOREIGN_KEY_CHECKS=0;"
 	showMasterStatusSQL = "SHOW MASTER STATUS;"
 )
 
@@ -30,12 +30,12 @@ const (
 	`
 
 	columnNamesTypesSQL = `
-		select table_schema, table_name, COLUMN_NAME, DATA_TYPE, ORDINAL_POSITION from information_schema.columns
+		select table_schema, table_name, COLUMN_NAME, DATA_TYPE, ORDINAL_POSITION, EXTRA from information_schema.columns
 		where table_schema ='%s' and table_name in (%s)
 		order by table_schema asc, table_name asc, ORDINAL_POSITION asc
 	`
 
-	autoIncrementsSQL = "SELECT `TABLE_SCHEMA`, `TABLE_NAME`, `AUTO_INCREMENT` FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME IN (%s)"
+	autoIncrementsSQL   = "SELECT `TABLE_SCHEMA`, `TABLE_NAME`, `AUTO_INCREMENT` FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '%s' AND TABLE_NAME IN (%s)"
 	setAutoIncrementSQL = "ALTER TABLE %s.%s AUTO_INCREMENT=%d"
 )
 
