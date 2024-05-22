@@ -160,8 +160,10 @@ func (s *tablesColumnsInfo) getTableFields(dbTbs map[string][]string, batchCnt i
 	for _, oneQuery := range querySqls {
 		rows, err := con.Query(oneQuery)
 		if err != nil {
+			if rows != nil {
+				rows.Close()
+			}
 			log.Println("fail to query mysql: " + oneQuery)
-			rows.Close()
 			return err
 		}
 
@@ -226,7 +228,9 @@ func (s *tablesColumnsInfo) getTableKeys(dbTbs map[string][]string, batchCnt int
 		for _, oneQuery := range querySqls {
 			rows, err := con.Query(oneQuery)
 			if err != nil {
-				rows.Close()
+				if rows != nil {
+					rows.Close()
+				}
 				log.Println("fail to query mysql: " + oneQuery)
 				return err
 			}
@@ -319,7 +323,9 @@ func (s *tablesColumnsInfo) getTableAutoIncrements(dbTbs map[string][]string, ba
 	for _, oneQuery := range querySqls {
 		rows, err := con.Query(oneQuery)
 		if err != nil {
-			rows.Close()
+			if rows != nil {
+				rows.Close()
+			}
 			log.Println("fail to query mysql: " + oneQuery)
 			return err
 		}
