@@ -23,6 +23,10 @@ func Start(host string, port uint, user string, password string, duration time.D
 		RollbackDelay:      duration,
 	}
 
+	if err := disableBinlog(); err != nil {
+		return fmt.Errorf("failed to disable binlog for current connection, err=%s", err.Error())
+	}
+
 	if err := disableKeyCheck(); err != nil {
 		return fmt.Errorf("failed to disable key check, err=%s", err.Error())
 	}
