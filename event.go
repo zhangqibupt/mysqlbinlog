@@ -108,7 +108,7 @@ func sendBinlogEvent(streamer *replication.BinlogStreamer, eventChan chan myBinE
 			if oneMyEvent.IfRowsEvent {
 				tbKey := getTableName(string(oneMyEvent.BinEvent.Table.Schema), string(oneMyEvent.BinEvent.Table.Table))
 				if shouldSkipTable(tbKey) {
-					log.Printf("skipping table %v as configured", tbKey)
+					log.Printf("skipping binlog event for table %v", tbKey)
 					continue
 				}
 				if _, ok := tableinfo.tableInfos[tbKey]; !ok {
