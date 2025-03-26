@@ -107,6 +107,10 @@ func sendBinlogEvent(streamer *replication.BinlogStreamer, eventChan chan myBinE
 			sqlType = getSqlType(ev)
 			if oneMyEvent.IfRowsEvent {
 				tbKey := getTableName(string(oneMyEvent.BinEvent.Table.Schema), string(oneMyEvent.BinEvent.Table.Table))
+				if shouldSkipTable(tbKey) {
+					log.Printf("skipping table %v as configured", tbKey)
+					continue
+				}
 				if _, ok := tableinfo.tableInfos[tbKey]; !ok {
 					log.Printf("no table struct found for %s, it maybe dropped, skip it. RowsEvent position:%s", tbKey, oneMyEvent.MyPos.String())
 					continue
