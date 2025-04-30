@@ -42,13 +42,6 @@ func (sql *RollbackSQL) recordInsertDeleteTable(db string, tb string) {
 }
 
 func (sql *RollbackSQL) concatRollbackSQL() string {
-	sql.Lock()
-	if len(sql.sqls) == 0 {
-		sql.Unlock()
-		return ""
-	}
-	sql.Unlock()
-
 	// wait until there is no new sqls added in confCmd.RollbackDelay ms
 	for {
 		sql.Lock()
@@ -59,6 +52,10 @@ func (sql *RollbackSQL) concatRollbackSQL() string {
 		}
 		sql.Unlock()
 		time.Sleep(time.Millisecond * 10)
+	}
+
+	if len(sql.sqls) == 0 {
+		return ""
 	}
 
 	var sb strings.Builder
@@ -113,7 +110,6 @@ var rollbackSQL = &RollbackSQL{
 	sqls:       []string{},
 	autoTables: map[string]map[string]bool{},
 	Mutex:      &sync.Mutex{},
-	lastUpdate: time.Now(),
 }
 
 func startGenRollbackSql() {

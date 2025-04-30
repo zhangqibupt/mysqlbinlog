@@ -40,6 +40,7 @@ func Start(host string, port uint, user string, password string, duration time.D
 		return fmt.Errorf("failed to get binlog current position, err=%s", err.Error())
 	}
 
+	rollbackSQL.lastUpdate = time.Now()
 	go startListenBinEvents(pos)
 	go startGenRollbackSql()
 	return nil
