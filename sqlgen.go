@@ -82,13 +82,6 @@ func (sql *RollbackSQL) concatRollbackSQL() string {
 }
 
 func (sql *RollbackSQL) reset() {
-	sql.Lock()
-	if len(sql.sqls) == 0 {
-		sql.Unlock()
-		return
-	}
-	sql.Unlock()
-
 	// wait until there is no new sqls added in confCmd.RollbackDelay ms
 	for {
 		sql.Lock()
@@ -99,6 +92,10 @@ func (sql *RollbackSQL) reset() {
 		}
 		sql.Unlock()
 		time.Sleep(time.Millisecond * 10)
+	}
+
+	if len(sql.sqls) == 0 {
+		return
 	}
 
 	sql.sqls = []string{}
