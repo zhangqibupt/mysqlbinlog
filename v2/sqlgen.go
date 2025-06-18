@@ -2,112 +2,14 @@ package mysqlbinlog
 
 import (
 	"fmt"
-	"log"
-	"strings"
-	"sync"
-	"time"
-
 	"github.com/davecgh/go-spew/spew"
 	"github.com/manilion/godropbox/database/sqlbuilder"
 	SQL "github.com/manilion/godropbox/database/sqlbuilder"
 	"github.com/siddontang/go-mysql/mysql"
 	"github.com/siddontang/go-mysql/replication"
+	"github.com/sirupsen/logrus"
+	"strings"
 )
-
-const BLOB = "blob"
-
-type RollbackSQL struct {
-	sqls       []string
-	autoTables map[string]map[string]bool // db, table => true
-	lastUpdate time.Time
-	*sync.Mutex
-}
-
-func (sql *RollbackSQL) append(sqls []string) {
-	sql.Lock()
-	defer sql.Unlock()
-	sql.sqls = append(sql.sqls, sqls...)
-	sql.lastUpdate = time.Now()
-}
-
-func (sql *RollbackSQL) recordInsertDeleteTable(db string, tb string) {
-	sql.Lock()
-	defer sql.Unlock()
-	tbls, ok := sql.autoTables[db]
-	if !ok {
-		tbls = map[string]bool{}
-		sql.autoTables[db] = tbls
-	}
-	tbls[tb] = true
-}
-
-func (sql *RollbackSQL) concatRollbackSQL() string {
-	// wait until there is no new sqls added in confCmd.RollbackDelay ms
-	for {
-		sql.Lock()
-		gap := time.Since(sql.lastUpdate)
-		if gap > confCmd.RollbackDelay {
-			defer sql.Unlock()
-			break
-		}
-		sql.Unlock()
-		time.Sleep(time.Millisecond * 10)
-	}
-
-	if len(sql.sqls) == 0 {
-		return ""
-	}
-
-	var sb strings.Builder
-
-	for i := len(sql.sqls) - 1; i >= 0; i-- {
-		sb.WriteString(sql.sqls[i])
-		sb.WriteString(";")
-	}
-	sql.sqls = []string{}
-
-	for db, tbls := range sql.autoTables {
-		for tb, _ := range tbls {
-			tbKey := getTableName(db, tb)
-			tbInfo, ok := tableinfo.tableInfos[tbKey]
-			if ok && tbInfo != nil {
-				sb.WriteString(fmt.Sprintf(setAutoIncrementSQL, db, tb, tbInfo.AutoIncrement))
-				sb.WriteString(";")
-			}
-		}
-	}
-	sql.autoTables = map[string]map[string]bool{}
-
-	return sb.String()
-}
-
-func (sql *RollbackSQL) reset() {
-	// wait until there is no new sqls added in confCmd.RollbackDelay ms
-	for {
-		sql.Lock()
-		gap := time.Since(sql.lastUpdate)
-		if gap > confCmd.RollbackDelay {
-			defer sql.Unlock()
-			break
-		}
-		sql.Unlock()
-		time.Sleep(time.Millisecond * 10)
-	}
-
-	if len(sql.sqls) == 0 {
-		return
-	}
-
-	sql.sqls = []string{}
-	sql.autoTables = map[string]map[string]bool{}
-	sql.lastUpdate = time.Now()
-}
-
-var rollbackSQL = &RollbackSQL{
-	sqls:       []string{},
-	autoTables: map[string]map[string]bool{},
-	Mutex:      &sync.Mutex{},
-}
 
 func startGenRollbackSql() {
 	var (
@@ -123,7 +25,7 @@ func startGenRollbackSql() {
 		uniqueKey      keyInfo
 		posStr         string
 	)
-	log.Print("start to generate rollback sql")
+	logrus.Info("start to generate rollback sql")
 
 	for ev := range eventChan {
 		if !ev.IfRowsEvent {
@@ -142,19 +44,19 @@ func startGenRollbackSql() {
 		for {
 			tbInfo, err = tableinfo.getTableInfo(db, tb, ev.MyPos.Name, ev.StartPos, ev.MyPos.Pos)
 			if err != nil {
-				log.Fatalf("error to found %s table structure for event %s", fulltb, posStr)
+				logrus.Panicf("error to found %s table structure for event %s", fulltb, posStr)
 			}
 			// when new table added, we need to update the table defination via `getTableInfo` and retry
 			if tbInfo == nil {
 				msg := fmt.Sprintf("no suitable table struct found for %s for event %s", fulltb, posStr)
 
 				if !canRetry {
-					log.Fatalf(msg)
+					logrus.Panicf(msg)
 				}
 
 				canRetry = false
 				if err = getTableInfo(); err != nil {
-					log.Fatalf(err.Error())
+					logrus.Panicf(err.Error())
 				}
 				continue
 			}
@@ -175,13 +77,13 @@ func startGenRollbackSql() {
 				len(colsTypeName), len(tbInfo.Columns), fulltb, ev.MyPos.String(), spew.Sdump(tbInfo.Columns), spew.Sdump(ev.BinEvent.Rows[0]))
 
 			if !canRetry {
-				log.Fatalf(msg)
+				logrus.Panicf(msg)
 			}
 
 			canRetry = false
-			log.Println(msg)
+			logrus.Info(msg)
 			if err = getTableInfo(); err != nil {
-				log.Fatalf(err.Error())
+				logrus.Panicf(err.Error())
 			}
 		}
 
@@ -197,7 +99,7 @@ func startGenRollbackSql() {
 						}
 						txtStr, coOk := ev.BinEvent.Rows[ri][ci].([]byte)
 						if !coOk {
-							log.Fatalf("fail to convert %s to []byte type", ev.BinEvent.Rows[ri][ci])
+							logrus.Panicf("fail to convert %s to []byte type", ev.BinEvent.Rows[ri][ci])
 						} else {
 							ev.BinEvent.Rows[ri][ci] = string(txtStr)
 						}
@@ -212,19 +114,31 @@ func startGenRollbackSql() {
 			uniqueKeyIdx = []int{}
 		}
 
+		if fulltb == markerDatabaseTableFullName {
+			if ev.SqlType == SQLTypeInsert {
+				if len(ev.BinEvent.Rows) != 1 {
+					logrus.Panicf("Error: marker table %s should only have one row inserted, but got %d at position %s", markerDatabaseTableFullName, len(ev.BinEvent.Rows), posStr)
+				}
+
+				markerID := ev.BinEvent.Rows[0][0].(int64)
+				rollbackSQL.appendMarker(markerID)
+			} else {
+				logrus.Infof("Error: marker table %s should only be inserted, but got %v at position %s", markerDatabaseTableFullName, ev.SqlType, posStr)
+			}
+			continue
+		}
+
 		if ev.SqlType == SQLTypeInsert {
 			sqls = genDeleteSqls(posStr, ev.BinEvent, colsDef, uniqueKeyIdx, false, true)
-			rollbackSQL.recordInsertDeleteTable(db, tb)
 		} else if ev.SqlType == SQLTypeDelete {
 			sqls = genInsertSqls(posStr, ev.BinEvent, colsDef, 20, true)
-			rollbackSQL.recordInsertDeleteTable(db, tb)
 		} else if ev.SqlType == SQLTypeUpdate {
 			sqls = genUpdateSqls(posStr, colsTypeNameFromMysql, colsTypeName, ev.BinEvent, colsDef, uniqueKeyIdx, false, true)
 		} else {
-			log.Printf("Error: unsupported query type %d to generate rollback sql, it should one of insert|update|delete. %s", ev.SqlType, ev.MyPos.String())
+			logrus.Infof("Warning: unsupported query type %d to generate rollback sql, it should one of insert|update|delete. %s", ev.SqlType, ev.MyPos.String())
 			continue
 		}
-		rollbackSQL.append(sqls)
+		rollbackSQL.appendGeneralSQLs(sqls, db, tb)
 	}
 }
 
@@ -243,7 +157,7 @@ func filterStoredGeneratedFields(names []fieldInfo, rows [][]interface{}) ([]fie
 	}
 	// remove columns
 	for i, col := range names {
-		if !containsInt(removalIds, i) {
+		if !ContainsInt(removalIds, i) {
 			newNames = append(newNames, col)
 		}
 	}
@@ -251,7 +165,7 @@ func filterStoredGeneratedFields(names []fieldInfo, rows [][]interface{}) ([]fie
 	for _, row := range rows {
 		newRow := make([]interface{}, 0, len(row))
 		for i, col := range row {
-			if !containsInt(removalIds, i) {
+			if !ContainsInt(removalIds, i) {
 				newRow = append(newRow, col)
 			}
 		}
@@ -259,16 +173,6 @@ func filterStoredGeneratedFields(names []fieldInfo, rows [][]interface{}) ([]fie
 	}
 
 	return newNames, newRows
-}
-
-// method to check if an int is in an int slice
-func containsInt(s []int, e int) bool {
-	for _, a := range s {
-		if a == e {
-			return true
-		}
-	}
-	return false
 }
 
 func getMysqlDataTypeNameAndSqlColumn(tpDef string, colName string, tp byte, meta uint16) (string, sqlbuilder.NonAliasColumn) {
@@ -436,10 +340,10 @@ func genInsertSqls(posStr string, rEv *replication.RowsEvent, colDefs []sqlbuild
 	sqlType = "insert_for_delete_rollback"
 	for i = 0; i < rowCnt; i += rowsPerSql {
 		insertSql = sqlbuilder.NewTable(table, newColDefs...).Insert(newColDefs...)
-		endIndex = minValue(rowCnt, i+rowsPerSql)
+		endIndex = MinValue(rowCnt, i+rowsPerSql)
 		oneSql, err = genInsertSqlForRows(rEv.Rows[i:endIndex], insertSql, schema, ifprefixDb, false, []int{})
 		if err != nil {
-			log.Printf("Error: Fail to generate for %v due to %s", rEv.Rows[i:endIndex], err.Error())
+			logrus.Infof("Error: Fail to generate for %v due to %s", rEv.Rows[i:endIndex], err.Error())
 		} else {
 			sqlArr = append(sqlArr, oneSql)
 		}
@@ -449,7 +353,7 @@ func genInsertSqls(posStr string, rEv *replication.RowsEvent, colDefs []sqlbuild
 		insertSql = sqlbuilder.NewTable(table, newColDefs...).Insert(newColDefs...)
 		oneSql, err = genInsertSqlForRows(rEv.Rows[endIndex:rowCnt], insertSql, schema, ifprefixDb, false, []int{})
 		if err != nil {
-			log.Printf("Error: Fail to generate %s sql for %s %s \n\terror: %s\n\trows data:%v", sqlType, getTableName(schema, table), posStr, err, rEv.Rows[endIndex:rowCnt])
+			logrus.Infof("Error: Fail to generate %s sql for %s %s \n\terror: %s\n\trows data:%v", sqlType, getTableName(schema, table), posStr, err, rEv.Rows[endIndex:rowCnt])
 		} else {
 			sqlArr = append(sqlArr, oneSql)
 		}
@@ -472,7 +376,7 @@ func genDeleteSqls(posStr string, rEv *replication.RowsEvent, colDefs []sqlbuild
 
 		sql, err := sqlbuilder.NewTable(table, colDefs...).Delete().Where(sqlbuilder.And(whereCond...)).String(schemaInSql)
 		if err != nil {
-			log.Printf("Error: Fail to generate %s sql for delete_for_insert_rollback %s \n\terror: %s\n\trows data:%v", getTableName(schema, table), posStr, err, row)
+			logrus.Infof("Error: Fail to generate %s sql for delete_for_insert_rollback %s \n\terror: %s\n\trows data:%v", getTableName(schema, table), posStr, err, row)
 		}
 		sqlArr[i] = sql
 	}
@@ -491,7 +395,7 @@ func genUpdateSetPart(colsTypeNameFromMysql []string, colTypeNames []string, upd
 				aArr, aOk := v.([]byte)
 				bArr, bOk := rowBefore[i].([]byte)
 				if aOk && bOk {
-					if compareEquelByteSlice(aArr, bArr) {
+					if CompareEquelByteSlice(aArr, bArr) {
 						ifUpdateCol = false
 					} else {
 						ifUpdateCol = true
@@ -544,7 +448,7 @@ func genUpdateSqls(posStr string, colsTypeNameFromMysql []string, colsTypeName [
 		upSql.Where(sqlbuilder.And(wherePart...))
 		sql, err = upSql.String(schemaInSql)
 		if err != nil {
-			log.Printf("Error: Fail to generate update_for_update_rollback sql for %s %s \n\terror: %s\n\trows data:%v\n%v", getTableName(schema, table), posStr, err, rEv.Rows[i], rEv.Rows[i+1])
+			logrus.Infof("Error: Fail to generate update_for_update_rollback sql for %s %s \n\terror: %s\n\trows data:%v\n%v", getTableName(schema, table), posStr, err, rEv.Rows[i], rEv.Rows[i+1])
 			continue
 		}
 		sqlArr = append(sqlArr, sql)
@@ -554,4 +458,17 @@ func genUpdateSqls(posStr string, colsTypeNameFromMysql []string, colsTypeName [
 
 func getPosStr(name string, spos uint32, epos uint32) string {
 	return fmt.Sprintf("%s %d-%d", name, spos, epos)
+}
+
+func getColIndexFromKey(ki keyInfo, columns []fieldInfo) []int {
+	arr := make([]int, len(ki))
+	for j, colName := range ki {
+		for i, f := range columns {
+			if f.FieldName == colName {
+				arr[j] = i
+				break
+			}
+		}
+	}
+	return arr
 }
