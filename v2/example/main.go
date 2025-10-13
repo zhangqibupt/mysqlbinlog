@@ -5,7 +5,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.freewheel.tv/bricks/mysqlbinlog/v2"
+	mysqlbinlog "github.com/zhangqibupt/mysqlbinlog/v2"
 )
 
 func main() {

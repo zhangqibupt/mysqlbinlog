@@ -22,13 +22,13 @@ Mysqlbinlog provides a lightweight solution for rolling back database changes by
 ## Installation
 
 ```bash
-go get github.freewheel.tv/bricks/mysqlbinlog
+go get github.com/zhangqibuptse/mysqlbinlog
 ```
 
 ## Quick Start
 
 ```go
-import "github.freewheel.tv/bricks/mysqlbinlog"
+import "github.com/zhangqibuptse/mysqlbinlog"
 
 func main() {
     // Initialize the binlog listener

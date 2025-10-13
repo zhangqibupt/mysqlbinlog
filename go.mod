@@ -1,4 +1,4 @@
-module github.freewheel.tv/bricks/mysqlbinlog
+module github.com/zhangqibuptse/mysqlbinlog
 
 go 1.18
 
