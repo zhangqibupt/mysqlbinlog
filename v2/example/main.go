@@ -2,10 +2,10 @@ package main
 
 import (
 	"github.com/sirupsen/logrus"
+	"github.com/zhangqibuptse/mysqlbinlog/v2"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	mysqlbinlog "github.com/zhangqibupt/mysqlbinlog/v2"
 )
 
 func main() {
