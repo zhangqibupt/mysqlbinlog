@@ -1,4 +1,4 @@
-module github.com/zhangqibuptse/mysqlbinlog
+module github.com/zhangqibupt/mysqlbinlog
 
 go 1.18
 

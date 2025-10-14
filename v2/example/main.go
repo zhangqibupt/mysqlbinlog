@@ -1,9 +1,10 @@
 package main
 
 import (
-	"github.com/sirupsen/logrus"
-	"github.com/zhangqibuptse/mysqlbinlog/v2"
 	"time"
+
+	"github.com/sirupsen/logrus"
+	"github.com/zhangqibupt/mysqlbinlog/v2"
 
 	_ "github.com/go-sql-driver/mysql"
 )
