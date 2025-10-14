@@ -1,122 +1,110 @@
-# Mysqlbinlog
+# 🪄 Mysqlbinlog
 
-A Go library for efficient database rollback operations using MySQL binlog.
+A Go library for efficient database rollback using MySQL binary logs.
 
-## Overview
 
-Mysqlbinlog provides a lightweight solution for rolling back database changes by leveraging MySQL's binary logging mechanism. It's particularly useful in scenarios like regression testing where you need to reset database state between test cases.
 
-### Key Features
 
-- Real-time monitoring of database changes through MySQL binlog
-- Automatic generation of rollback SQL statements
-- Efficient delta-based rollback operations
-- Support for INSERT, UPDATE, and DELETE operations
 
-## Prerequisites
+
+# 🚀 Overview
+
+Mysqlbinlog is a lightweight Go library that lets you undo database changes by reading MySQL's binary logs.
+It’s especially useful in automated testing, data recovery, or sandboxed environments where you need to repeatedly reset the database state.
+
+# ✨ Features
+
+🔄 Real-time tracking of database changes via MySQL binlog
+
+🧾 Automatic generation of rollback SQL statements
+
+⚡ Delta-based rollback for high efficiency
+
+🧩 Supports INSERT, UPDATE, and DELETE operations
+
+🧠 Optional schema caching for faster startup
+
+# 📋 Requirements
 
 - MySQL server with binlog enabled
-- Go 1.18 or later
-- MySQL user with appropriate privileges (REPLICATION CLIENT, SELECT)
+- MySQL user with privileges: REPLICATION CLIENT, SELECT
+- Go 1.18+
 
-## Installation
-
-```bash
-go get github.com/zhangqibuptse/mysqlbinlog
+# 📦 Installation
+```
+go get github.com/zhangqibupt/mysqlbinlog/v2
 ```
 
-## Quick Start
+# 🧠 Quick Start
 
-```go
-import "github.com/zhangqibuptse/mysqlbinlog"
+Here’s a simple example of resetting database state between test cases:
+
+```
+package main
+
+import (
+    "log"
+    "github.com/zhangqibupt/mysqlbinlog/v2"
+)
 
 func main() {
-    // Initialize the binlog listener
+    // 1️⃣ Initialize the binlog listener
     err := mysqlbinlog.Start("localhost", 3306, "user", "password")
     if err != nil {
         log.Fatalf("Failed to start binlog listener: %v", err)
     }
     defer mysqlbinlog.Stop()
 
-    // Run your test cases
+    // 2️⃣ Example: run multiple test cases with rollback
     for i := 0; i < 10; i++ {
-        // Mark the beginning of a test case
-        mysqlbinlog.Begin()
-        
-        // Execute your test operations
-        // INSERT, UPDATE, DELETE statements...
-        
-        // Rollback changes after the test
-        mysqlbinlog.Rollback()
+        mysqlbinlog.Begin() // start tracking
+
+        // ... perform DB operations: INSERT, UPDATE, DELETE
+
+        mysqlbinlog.Rollback() // undo all changes
     }
 }
 ```
 
-## API Reference
 
-### Core Functions
+✅ Tip: Schema caching can drastically improve startup time in local development (see config below).
 
-- `Start(host string, port uint, user string, password string) error`
-  - Initializes the binlog listener
-  - Connects to the MySQL server
-  - Loads table schemas
+## 🔧 Environment Variables
 
-- `Begin()`
-  - Marks the beginning of a new operation set
-  - Used to track changes for rollback
+| Variable | Description |
+|-----------|--------------|
+| **MYSQL_BINLOG_CACHE** | Enable schema caching (stores cache files locally: `mysql.binlog.cache.1`, `mysql.binlog.cache.2`) |
+| **MYSQL_BINLOG_LOG_LEVEL** | Logging verbosity. Options: `debug`, `info`, `warn`, `error` (default: `info`) <br> Use `debug` to print generated rollback SQLs |
 
-- `Rollback()`
-  - Reverts all changes made since the last `Begin()`
-  - Executes generated rollback SQL statements
+---
 
-- `Stop()`
-  - Stops the binlog listener
-  - Cleans up resources
+## ⚠️ Limitations
 
-### Configuration
+| Category | Description |
+|-----------|--------------|
+| **DDL Operations** | Schema-altering statements (`CREATE`, `ALTER`, `DROP`) are **not supported**. <br> Changing table structures during runtime may cause errors. |
+| **Concurrency** | Running tests in parallel is **not supported** — rollback statements might interleave. |
+| **Performance** | Schema loading can take several seconds initially. <br> Use caching to speed up development. |
 
-#### Environment Variables
 
-- `MYSQL_BINLOG_CACHE`: Set to any value to enable schema caching
-  - Caches table schemas in the current working directory
-  - Improves startup time for local testing
-  - Cache files: `mysql.binlog.cache.1` and `mysql.binlog.cache.2`
+# 💡 Best Practices
 
-- `MYSQL_BINLOG_LOG_LEVEL`: Set logging level
-  - Default: "info"
-  - Options: "debug", "info", "warn", "error"
-  - Debug level prints rollback SQL statements
+- Always call Stop() before program exit.
+- Use Begin() / Rollback() in pairs.
+- Enable schema caching during development.
+- Set MYSQL_BINLOG_LOG_LEVEL=debug to inspect rollback SQL.
+- Make sure MySQL binlog is properly configured (binlog_format=ROW recommended).
 
-## Limitations
+# 🧩 Example
 
-1. DDL Operations
-   - Schema changes (CREATE, ALTER, DROP) are not supported
-   - Table structure changes during operation may cause issues
+👉 See `example/main.go` for a complete working demo.
 
-2. Concurrency
-   - Parallel test execution is not supported
-   - Rollback SQLs may be mixed up if multiple cases run simultaneously
+# 🤝 Contributing
 
-3. Performance
-   - Initial schema loading may take several seconds
-   - Use `MYSQL_BINLOG_CACHE` for faster local development
+Contributions are welcome!
+Please open an issue or submit a PR to help improve the library.
 
-## Best Practices
+# 📄 License
 
-1. Always call `Stop()` before program termination
-2. Use `Begin()` and `Rollback()` in pairs
-3. Enable schema caching for local development
-4. Set appropriate log level for debugging
-5. Ensure MySQL binlog is enabled and properly configured
-
-## Example
-
-See the [example](./example/main.go) directory for a complete working example.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-MIT
+MIT License
+ © 2025 Zhang Qi
